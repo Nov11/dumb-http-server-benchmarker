@@ -65,7 +65,10 @@ public class TestRunner {
     public CompletableFuture<Void> send() {
         int seq = pending.getAndDecrement();
         if (seq > 0) {
-            CompletableFuture<HttpResponse> future = doGet(seq);
+            CompletableFuture<Void> future = doGet(seq).exceptionally(e -> {
+                logger.error("resp error", e);
+                return null;
+            });
             return future.thenCompose(v -> send());
         }
         return CompletableFuture.completedFuture(null);
@@ -86,13 +89,13 @@ public class TestRunner {
         System.exit(0);
     }
 
-    private CompletableFuture<HttpResponse> doGet(int seq) {
+    private CompletableFuture<Void> doGet(int seq) {
         CallBack result = new CallBack(queue, seq);
         httpclient.execute(getRequest, result);
         return result;
     }
 
-    private static class CallBack extends CompletableFuture<HttpResponse> implements FutureCallback<HttpResponse> {
+    private static class CallBack extends CompletableFuture<Void> implements FutureCallback<HttpResponse> {
         private final long start = System.currentTimeMillis();
         private final Queue<Long> queue;
         private final int sequence;
@@ -104,7 +107,7 @@ public class TestRunner {
 
         public void completed(HttpResponse result) {
             save();
-            this.complete(result);
+            this.complete(null);
         }
 
         public void failed(Exception ex) {
